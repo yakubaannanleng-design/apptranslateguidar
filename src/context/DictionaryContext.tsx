@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import type { TranslationEntry } from "../lib/languages";
 import { getCoreTranslation } from "../lib/translator-engine";
-import { normalizeWord } from "../lib/text";
+import { normalizeWord, parseCsv, toCsv } from "../lib/text";
 
 interface SyncStatus {
   connected: boolean;
@@ -39,7 +39,9 @@ interface DictionaryContextType {
   testServerConnection: () => Promise<void>;
   syncWithServer: () => Promise<SyncResult>;
   exportToJson: () => void;
+  exportToCsv: () => void;
   importFromJson: (jsonString: string, mode?: ImportMode) => ImportMode | null;
+  importFromCsv: (csvString: string, mode?: ImportMode) => ImportMode | null;
 }
 
 const DictionaryContext = createContext<DictionaryContextType | undefined>(undefined);
@@ -333,6 +335,16 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
     URL.revokeObjectURL(url);
   }, [dictionary]);
 
+  const exportToCsv = useCallback(() => {
+    const blob = new Blob([toCsv(dictionary)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `dictionnaire-guidar-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [dictionary]);
+
   const importFromJson = useCallback(
     (jsonString: string, mode: ImportMode = "replace"): ImportMode | null => {
       try {
@@ -342,6 +354,40 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
           .map(sanitizeEntry)
           .filter((entry): entry is TranslationEntry => entry !== null);
         if (entries.length === 0) throw new Error("Aucune entrée valide dans le fichier.");
+
+        setDictionary((prev) =>
+          mode === "merge" ? mergeDictionaries(prev, entries) : entries,
+        );
+        setSyncStatus((prev) => ({ ...prev, error: null }));
+        return mode;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncStatus((prev) => ({ ...prev, error: message }));
+        return null;
+      }
+    },
+    [],
+  );
+
+  const importFromCsv = useCallback(
+    (csvString: string, mode: ImportMode = "replace"): ImportMode | null => {
+      try {
+        const parsed = parseCsv(csvString);
+        if (parsed.length === 0) throw new Error("Aucune ligne valide dans le CSV.");
+
+        const entries = parsed
+          .map((row) =>
+            sanitizeEntry({
+              sourceLang: row.sourceLang,
+              sourceWord: row.sourceWord,
+              targetLang: row.targetLang,
+              targetWord: row.targetWord,
+              createdAt: Date.now(),
+            }),
+          )
+          .filter((entry): entry is TranslationEntry => entry !== null);
+
+        if (entries.length === 0) throw new Error("Aucune entrée valide dans le CSV.");
 
         setDictionary((prev) =>
           mode === "merge" ? mergeDictionaries(prev, entries) : entries,
@@ -375,7 +421,9 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
         testServerConnection,
         syncWithServer,
         exportToJson,
+        exportToCsv,
         importFromJson,
+        importFromCsv,
       }}
     >
       {children}

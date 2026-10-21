@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./server:/app/server
+    environment:
+      - PORT=8787
+      - DB_FILE=/app/server/dictionary.sqlite

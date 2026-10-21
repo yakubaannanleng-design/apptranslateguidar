@@ -18,6 +18,7 @@ import { OcrResultLinker } from "./OcrResultLinker";
 export function Educator() {
   const {
     dictionary, addEntry, updateEntry, removeEntry, clearDictionary, importFromJson,
+    importFromCsv, exportToJson, exportToCsv,
   } = useDictionary();
   const [sourceLang, setSourceLang] = useState("fr");
   const [targetLang, setTargetLang] = useState("guidar");
@@ -30,6 +31,7 @@ export function Educator() {
   const [showScanner, setShowScanner] = useState(false);
   const [extractedGuidar, setExtractedGuidar] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,8 +94,23 @@ export function Educator() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       const mode = importFromJson(text, "merge");
-      if (mode) toast.success("Dictionnaire importé et fusionné !");
+      if (mode) toast.success("Dictionnaire JSON importé et fusionné !");
       else toast.error("Import impossible : vérifiez le format JSON.");
+    };
+    reader.onerror = () => toast.error("Erreur lors de la lecture du fichier.");
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const mode = importFromCsv(text, "merge");
+      if (mode) toast.success("Dictionnaire CSV importé et fusionné !");
+      else toast.error("Import impossible : vérifiez le format CSV.");
     };
     reader.onerror = () => toast.error("Erreur lors de la lecture du fichier.");
     reader.readAsText(file);
@@ -150,6 +167,32 @@ export function Educator() {
                 className="hidden"
                 onChange={handleImportFile}
               />
+              <Button
+                variant="outline"
+                onClick={() => csvInputRef.current?.click()}
+                className="h-14 px-6 rounded-2xl bg-white/10 border-white/20 text-white font-black uppercase italic tracking-widest hover:bg-white/20 transition-all backdrop-blur-md"
+              >
+                Importer CSV
+                <Database className="w-4 h-4 ml-3" />
+              </Button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleImportCsv}
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportToCsv();
+                  toast.success("Export CSV téléchargé !");
+                }}
+                className="h-14 px-6 rounded-2xl bg-white/10 border-white/20 text-white font-black uppercase italic tracking-widest hover:bg-white/20 transition-all backdrop-blur-md"
+              >
+                Exporter CSV
+                <Database className="w-4 h-4 ml-3" />
+              </Button>
             </div>
           </div>
           <div className="hidden sm:flex w-32 h-32 bg-white/10 rounded-3xl backdrop-blur-2xl items-center justify-center border border-white/20 shadow-2xl rotate-3">

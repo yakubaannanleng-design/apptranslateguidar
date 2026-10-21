@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
     "server": "node server/server.cjs",
+    "server:sqlite": "node server/server-sqlite.cjs",
     "dev:full": "concurrently -n api,web -c yellow,cyan \"npm run server\" \"npm run dev\""
   },
   "engines": {
