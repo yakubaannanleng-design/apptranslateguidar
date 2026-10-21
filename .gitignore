@@ -11,3 +11,4 @@ server/dictionary.json.tmp
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+server/dictionary.sqlite
