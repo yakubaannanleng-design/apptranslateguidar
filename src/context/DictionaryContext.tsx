@@ -49,7 +49,8 @@ const DictionaryContext = createContext<DictionaryContextType | undefined>(undef
 const STORAGE_KEY = "tradai_dictionary_v2";
 const SERVER_URL_KEY = "tradai_server_url";
 const AUTO_SYNC_KEY = "tradai_auto_sync";
-const DEFAULT_SERVER_URL = "http://localhost:8787";
+const DEFAULT_SERVER_URL =
+  (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "http://localhost:8787";
 
 export function createId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
