@@ -52,6 +52,19 @@ const AUTO_SYNC_KEY = "tradai_auto_sync";
 const DEFAULT_SERVER_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "http://localhost:8787";
 
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+function supabaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    apikey: SUPABASE_ANON_KEY || "",
+    Authorization: `Bearer ${SUPABASE_ANON_KEY || ""}`,
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
+
 export function createId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -131,6 +144,30 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
 
   const pushToServer = useCallback(
     async (data: TranslationEntry[]): Promise<SyncResult> => {
+      if (USE_SUPABASE) {
+        setSyncStatus((prev) => ({ ...prev, syncing: true, error: null }));
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/translations`, {
+            method: "DELETE",
+            headers: supabaseHeaders({ Prefer: "return=minimal" }),
+          });
+          if (data.length > 0) {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/translations`, {
+              method: "POST",
+              headers: supabaseHeaders({ Prefer: "return=minimal" }),
+              body: JSON.stringify(data),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          }
+          setSyncStatus({ connected: true, lastSyncAt: Date.now(), syncing: false, error: null });
+          return { ok: true };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setSyncStatus({ connected: false, lastSyncAt: null, syncing: false, error: message });
+          return { ok: false, error: message };
+        }
+      }
+
       const baseUrl = normalizeServerUrl(serverUrl);
       if (!baseUrl) return { ok: false, error: "Aucune URL de serveur configurée." };
 
@@ -159,6 +196,26 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
   );
 
   const pullFromServer = useCallback(async (): Promise<TranslationEntry[] | null> => {
+    if (USE_SUPABASE) {
+      setSyncStatus((prev) => ({ ...prev, syncing: true, error: null }));
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/translations?select=*`, {
+          headers: supabaseHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const entries = (Array.isArray(data) ? data : [])
+          .map(sanitizeEntry)
+          .filter((entry): entry is TranslationEntry => entry !== null);
+        setSyncStatus({ connected: true, lastSyncAt: Date.now(), syncing: false, error: null });
+        return entries;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncStatus({ connected: false, lastSyncAt: null, syncing: false, error: message });
+        return null;
+      }
+    }
+
     const baseUrl = normalizeServerUrl(serverUrl);
     if (!baseUrl) return null;
 
@@ -297,6 +354,21 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
   );
 
   const testServerConnection = useCallback(async () => {
+    if (USE_SUPABASE) {
+      setSyncStatus((prev) => ({ ...prev, syncing: true, error: null }));
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/translations?select=count`, {
+          headers: supabaseHeaders(),
+        });
+        if (!response.ok) throw new Error(`Réponse HTTP ${response.status}`);
+        setSyncStatus({ connected: true, lastSyncAt: null, syncing: false, error: null });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncStatus({ connected: false, lastSyncAt: null, syncing: false, error: message });
+      }
+      return;
+    }
+
     const baseUrl = normalizeServerUrl(serverUrl);
     if (!baseUrl) {
       setSyncStatus((prev) => ({ ...prev, error: "Veuillez entrer une URL de serveur." }));
