@@ -1,22 +1,30 @@
 /**
- * Moteur OCR basé sur tesseract.js.
- *
- * Le guidar n'a pas de modèle d'apprentissage dédié : on utilise les modèles
- * latins français + anglais, qui couvrent l'alphabet latin étendu utilisé
- * notamment dans les documents bilingues. La qualité dépend fortement de la
- * photo (netteté, éclairage, perspective).
+ * Moteur OCR basé sur tesseract.js, avec repli CDN si le paquet local
+ * n'est pas installé.
  */
 export const OCR_LANGUAGES = "fra+eng";
 
 let workerPromise: Promise<any> | null = null;
 let currentProgressHandler: ((progress: number) => void) | null = null;
 
+const TESSERACT_MODULE = "tesseract.js";
+const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+
+async function loadTesseractModule(): Promise<any> {
+  try {
+    return await import(/* @vite-ignore */ TESSERACT_MODULE);
+  } catch {
+    return await import(/* @vite-ignore */ TESSERACT_CDN);
+  }
+}
+
 async function getWorker(): Promise<any> {
   if (!workerPromise) {
     workerPromise = (async () => {
-      const TESSERACT_MODULE = "tesseract.js";
-      const module = await import(/* @vite-ignore */ TESSERACT_MODULE);
-      return module.createWorker(OCR_LANGUAGES, 1, {
+      const module = await loadTesseractModule();
+      const createWorker = module.createWorker || module.default?.createWorker;
+      if (!createWorker) throw new Error("Moteur OCR indisponible.");
+      return createWorker(OCR_LANGUAGES, 1, {
         logger: (message: any) => {
           if (message.status === "recognizing text" && currentProgressHandler) {
             currentProgressHandler(message.progress);
@@ -57,10 +65,6 @@ export function splitIntoWords(text: string): string[] {
     .filter((word) => word.length > 1);
 }
 
-/**
- * Aligne les mots source et cible.
- * Heuristique : si les nombres de mots sont proches, on aligne par position.
- */
 export function alignWords(
   sourceWords: string[],
   targetWords: string[],
@@ -87,5 +91,3 @@ export function alignWords(
 
   return pairs;
 }
-
-
