@@ -93,9 +93,9 @@ export function Educator() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const mode = importFromJson(text, "merge");
-      if (mode) toast.success("Dictionnaire JSON importé et fusionné !");
-      else toast.error("Import impossible : vérifiez le format JSON.");
+      const result = importFromJson(text, "merge");
+      if (result.mode) toast.success("Dictionnaire JSON importé et fusionné !");
+      else toast.error(result.error || "Import impossible : vérifiez le format JSON.");
     };
     reader.onerror = () => toast.error("Erreur lors de la lecture du fichier.");
     reader.readAsText(file);
@@ -108,9 +108,9 @@ export function Educator() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const mode = importFromCsv(text, "merge");
-      if (mode) toast.success("Dictionnaire CSV importé et fusionné !");
-      else toast.error("Import impossible : vérifiez le format CSV.");
+      const result = importFromCsv(text, "merge");
+      if (result.mode) toast.success("Dictionnaire CSV importé et fusionné !");
+      else toast.error(result.error || "Import impossible : vérifiez le format CSV.");
     };
     reader.onerror = () => toast.error("Erreur lors de la lecture du fichier.");
     reader.readAsText(file);

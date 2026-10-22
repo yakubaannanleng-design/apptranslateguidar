@@ -40,8 +40,8 @@ interface DictionaryContextType {
   syncWithServer: () => Promise<SyncResult>;
   exportToJson: () => void;
   exportToCsv: () => void;
-  importFromJson: (jsonString: string, mode?: ImportMode) => ImportMode | null;
-  importFromCsv: (csvString: string, mode?: ImportMode) => ImportMode | null;
+  importFromJson: (jsonString: string, mode?: ImportMode) => { mode: ImportMode | null; error?: string };
+  importFromCsv: (csvString: string, mode?: ImportMode) => { mode: ImportMode | null; error?: string };
 }
 
 const DictionaryContext = createContext<DictionaryContextType | undefined>(undefined);
@@ -419,11 +419,17 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
   }, [dictionary]);
 
   const importFromJson = useCallback(
-    (jsonString: string, mode: ImportMode = "replace"): ImportMode | null => {
+    (jsonString: string, mode: ImportMode = "replace"): { mode: ImportMode | null; error?: string } => {
       try {
-        const parsed = JSON.parse(jsonString);
-        if (!Array.isArray(parsed)) throw new Error("Le fichier doit contenir un tableau JSON.");
-        const entries = parsed
+        const cleaned = jsonString.replace(/^\uFEFF/, "").trim();
+        const parsed = JSON.parse(cleaned);
+        const source = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.data)
+            ? parsed.data
+            : null;
+        if (!source) throw new Error("Le fichier doit contenir un tableau JSON.");
+        const entries = source
           .map(sanitizeEntry)
           .filter((entry): entry is TranslationEntry => entry !== null);
         if (entries.length === 0) throw new Error("Aucune entrée valide dans le fichier.");
@@ -432,20 +438,20 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
           mode === "merge" ? mergeDictionaries(prev, entries) : entries,
         );
         setSyncStatus((prev) => ({ ...prev, error: null }));
-        return mode;
+        return { mode };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setSyncStatus((prev) => ({ ...prev, error: message }));
-        return null;
+        return { mode: null, error: message };
       }
     },
     [],
   );
 
   const importFromCsv = useCallback(
-    (csvString: string, mode: ImportMode = "replace"): ImportMode | null => {
+    (csvString: string, mode: ImportMode = "replace"): { mode: ImportMode | null; error?: string } => {
       try {
-        const parsed = parseCsv(csvString);
+        const parsed = parseCsv(csvString.replace(/^\uFEFF/, ""));
         if (parsed.length === 0) throw new Error("Aucune ligne valide dans le CSV.");
 
         const entries = parsed
@@ -466,11 +472,11 @@ export function DictionaryProvider({ children }: { children: React.ReactNode }) 
           mode === "merge" ? mergeDictionaries(prev, entries) : entries,
         );
         setSyncStatus((prev) => ({ ...prev, error: null }));
-        return mode;
+        return { mode };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setSyncStatus((prev) => ({ ...prev, error: message }));
-        return null;
+        return { mode: null, error: message };
       }
     },
     [],
